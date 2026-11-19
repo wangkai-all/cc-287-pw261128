@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Active-set merge lab</title>
+<link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+<header class="topbar">
+  <div>
+    <h1>Active-set merge lab</h1>
+    <p class="sub">Two independent shard processes · exact baseline · union-only sketches · deletion-safe epochs</p>
+  </div>
+  <div class="topbar-status">
+    <span id="conn" class="pill pill-muted">connecting…</span>
+    <button id="refresh" class="btn btn-ghost" type="button">Refresh</button>
+    <label class="auto"><input id="auto" type="checkbox" checked /> auto-refresh 2s</label>
+  </div>
+</header>
+
+<main>
+  <section class="cards" id="cards" aria-label="Headline numbers">
+    <article class="card">
+      <h2>Exact merged live</h2>
+      <p class="big" id="exactLive">—</p>
+      <p class="note" id="exactNote">deduplicated across shards, LWW by version</p>
+    </article>
+    <article class="card">
+      <h2>Published estimate</h2>
+      <p class="big" id="published">—</p>
+      <p class="note" id="publishedNote">—</p>
+    </article>
+    <article class="card">
+      <h2>Error vs exact</h2>
+      <p class="big" id="error">—</p>
+      <p class="note" id="errorNote">—</p>
+    </article>
+    <article class="card">
+      <h2>Deletion divergence</h2>
+      <p class="big" id="lag">—</p>
+      <p class="note" id="lagNote">keys live on a shard but tombstoned in the merge</p>
+    </article>
+    <article class="card">
+      <h2>Summary storage</h2>
+      <p class="big" id="storage">—</p>
+      <p class="note" id="storageNote">—</p>
+    </article>
+  </section>
+
+  <section class="panel" aria-labelledby="decisionTitle">
+    <div class="panel-head">
+      <h2 id="decisionTitle">How this version was produced</h2>
+      <span class="pill" id="pathPill">—</span>
+    </div>
+    <p class="decision-summary" id="decisionSummary">—</p>
+    <ul class="reasons" id="reasons"></ul>
+    <div class="cols">
+      <div>
+        <h3>Exact plane</h3>
+        <dl class="kv" id="exactKv"></dl>
+      </div>
+      <div>
+        <h3>Approximate plane</h3>
+        <dl class="kv" id="approxKv"></dl>
+      </div>
+      <div>
+        <h3>Error decomposition</h3>
+        <dl class="kv" id="decompKv"></dl>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="shardsTitle">
+    <div class="panel-head">
+      <h2 id="shardsTitle">Shards</h2>
+      <span class="note">independent OS processes; each owns a journal, an exact set and a summary</span>
+    </div>
+    <div class="table-wrap">
+      <table id="shardsTable">
+        <thead>
+          <tr>
+            <th>Shard</th><th>Live</th><th>Tombstones</th><th>Generation</th>
+            <th>Summary age</th><th>Summary bytes</th><th>Exact bytes</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="chartsTitle">
+    <div class="panel-head">
+      <h2 id="chartsTitle">Accuracy and cost</h2>
+      <span class="note">every point is a real publish against the exact baseline at that moment</span>
+    </div>
+    <div class="chart-grid">
+      <figure>
+        <figcaption>Published estimate vs exact live</figcaption>
+        <canvas id="chartAccuracy" width="760" height="240"></canvas>
+        <p class="note">Line = exact baseline. Dots = published estimate; hollow gold dots show what the uncorrected merge would have said.</p>
+      </figure>
+      <figure>
+        <figcaption>Deletion divergence impact (linear counter)</figcaption>
+        <canvas id="chartDeletion" width="760" height="220"></canvas>
+        <p class="note">Merge-path bias is exact and comes from version maps: union live minus merged live.</p>
+      </figure>
+      <figure>
+        <figcaption>Storage: exact version maps vs approximate summaries</figcaption>
+        <canvas id="chartStorage" width="760" height="220"></canvas>
+        <p class="note">Summaries are fixed-size in the number of entities; exact maps grow with keys and tombstones.</p>
+      </figure>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="controlsTitle">
+    <h2 id="controlsTitle">Controls</h2>
+    <div class="controls">
+      <div class="control-group">
+        <h3>Publish</h3>
+        <div class="btn-row">
+          <button class="btn" data-action="collect" data-mode="auto" type="button">Collect + auto</button>
+          <button class="btn" data-action="collect" data-mode="merge" type="button">Force merge</button>
+          <button class="btn" data-action="collect" data-mode="recompute" type="button">Recompute</button>
+          <button class="btn btn-ghost" data-action="collect" data-mode="exact" type="button">Exact only</button>
+        </div>
+      </div>
+      <div class="control-group">
+        <h3>Evidence</h3>
+        <div class="btn-row">
+          <button class="btn btn-ghost" data-action="verify" type="button">Verify against exact</button>
+          <button class="btn btn-ghost" data-action="repair" type="button">Repair divergence</button>
+        </div>
+      </div>
+      <div class="control-group">
+        <h3>Scenarios</h3>
+        <div class="btn-row">
+          <button class="btn btn-ghost" data-action="scenario" data-scenario="divergent-deletes" type="button">Delete on one shard only</button>
+          <button class="btn btn-ghost" data-action="scenario" data-scenario="late-events" type="button">Late events</button>
+          <button class="btn btn-ghost" data-action="scenario" data-scenario="stash" type="button">Stash bundle</button>
+          <button class="btn btn-ghost" data-action="scenario" data-scenario="replay-old" type="button">Replay old bundle</button>
+        </div>
+      </div>
+      <div class="control-group">
+        <h3>Failure injection</h3>
+        <div class="btn-row">
+          <button class="btn btn-ghost" data-action="shard" data-shard="shard-a" data-shard-action="freeze" type="button">Freeze A</button>
+          <button class="btn btn-ghost" data-action="shard" data-shard="shard-a" data-shard-action="unfreeze" type="button">Unfreeze A</button>
+          <button class="btn btn-ghost" data-action="shard" data-shard="shard-a" data-shard-action="crash" type="button">Crash A</button>
+          <button class="btn btn-ghost" data-action="shard" data-shard="shard-a" data-shard-action="restart" type="button">Restart A</button>
+        </div>
+      </div>
+    </div>
+    <pre id="log" class="log" aria-live="polite"></pre>
+  </section>
+
+  <section class="panel" aria-labelledby="verifyTitle">
+    <div class="panel-head">
+      <h2 id="verifyTitle">Verification evidence</h2>
+      <span id="verifyStamp" class="note">not run yet</span>
+    </div>
+    <div id="verifyBox" class="verify-box note">Press “Verify against exact” to rebuild the summary from exact keys and compare it with the published number.</div>
+  </section>
+
+  <section class="panel" aria-labelledby="histTitle">
+    <h2 id="histTitle">Version history</h2>
+    <div class="table-wrap">
+      <table id="historyTable">
+        <thead><tr><th>#</th><th>Path</th><th>Exact live</th><th>Published</th><th>Error</th><th>Lag</th><th>Trigger</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="recoveryTitle">
+    <h2 id="recoveryTitle">Recovery and rejected traffic</h2>
+    <div class="cols">
+      <div>
+        <h3>Interrupted publishes</h3>
+        <ul class="list" id="interrupted"></ul>
+      </div>
+      <div>
+        <h3>Rejected / ignored bundles</h3>
+        <ul class="list" id="rejects"></ul>
+      </div>
+      <div>
+        <h3>Repair runs</h3>
+        <ul class="list" id="repairs"></ul>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>Exact state is the authority. Approximate summaries are union-only, rebuilt per epoch, never decremented.</p>
+</footer>
+
+<script src="/app.js"></script>
+</body>
+</html>

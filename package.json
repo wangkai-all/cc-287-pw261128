@@ -1,0 +1,18 @@
+{
+  "name": "activeset-lab",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Multi-shard active-entity counting: exact baseline, CRDT merge and mergeable approximate summaries with tombstone-safe epochs",
+  "main": "src/coordinator/server.js",
+  "scripts": {
+    "start": "node scripts/start.js",
+    "seed": "node scripts/seed.js",
+    "demo": "node scripts/demo.js",
+    "test": "node --test tests/*.test.js",
+    "test:unit": "node --test tests/sketches.test.js tests/exact.test.js tests/coordinator.test.js",
+    "test:cluster": "node --test tests/cluster.test.js"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
